@@ -1,17 +1,10 @@
-from argparse import ArgumentError
-
-
 class Standard(object):
     def __setitem__(self, key, value):
-        self[key] = value
+        setattr(self, key, value)
         return self[key]
 
     def __getitem__(self, item):
-        if hasattr(self, item):
-            return self[item]
-        else:
-            print("Error #1")
-            return None
+        return getattr(self, item, None)
 
     def getAttr(self, name):
         return self[name]
@@ -59,8 +52,11 @@ class Field(Standard):
                 else:
                     print("Error #4")
                     return None
-            if create:
+            elif create:
                 self.__field[coordinates.t][coordinates.l][property] = val
+            else:
+                print("Error #5")
+                return None
 
     def getNeighbour_Down(self, ownCoordinates):
         if ownCoordinates.t + 1 <= self.__h - 1:
@@ -212,7 +208,7 @@ class FieldElem(Standard):
 
 def main():
     field = Field(16, 16, 40)
-    field.setFieldElemProperty(Coordinate(0, 0), "test", "Ja", create=True)
+    field.setFieldElemProperty(Coordinate(0, 0), "__hidden", 5, create=False)
     print("done")
 
 
