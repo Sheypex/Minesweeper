@@ -39,46 +39,54 @@ class Bunch(dict):
 
 class Field(Standard):
     def __init__(self, w=10, h=10, mines=10):
+        # Common field sizes and corresponding mine count, most typical have |> at the end of the line:
+        # 9 x 9, 10 |>
+        # 9 x 9, 35
+        # 16 x 16, 40 |>
+        # 16 x 16, 99
+        # 30 x 16, 99 |>
+        # 30 x 20, 145
+        # 30 x 16, 170
         self.__w = w
         self.__h = h
         self.__mines = mines
         self.__field = []  # field coordinates: 0 -> first
         # init Field:
-        for i in range(w):
+        for i in range(h):
             buf = []
-            for j in range(h):
+            for j in range(w):
                 buf.append(FieldElem(self, Coordinate(j, i), "N", 0))
             self.__field.append(buf)
         self.generateField()
 
-    def generateField(self, maxIter=400):
+    def generateField(self, maxIter=5000):
         minesLeft = self.__mines
+        minesPlaced = 0
+        iterCount = 0
         area = self.__w * self.__h
-        if not minesLeft < area:
-            print("Error #1")
-            return None
-        currL = 0
-        currT = 0
-        while minesLeft > 0 and maxIter >= 0:
-            rand = random.random()
-            quo = area / minesLeft
-            if rand <= quo:
-                self.getFieldElem(Coordinate(currL, currT)).setAttr("__fieldType", "M")
-                minesLeft -= 1
-            if currL < self.__w - 1:
-                currL += 1
-            elif currT < self.__h - 1:
-                currT += 1
-            elif not (currL < self.__w - 1) and currT < self.__h - 1:
-                currL = 0
-                currT += 1
-            elif currL < self.__w - 1 and not (currT < self.__h - 1):
-                currL += 1
-                currT = 0
-            else:
-                currL = 0
-                currT = 0
-            maxIter -= 1
+        if area > minesLeft:
+            currL = 0
+            currT = 0
+            while minesLeft > 0 and maxIter >= 0:
+                rand = random.random()
+                quo = minesLeft / area
+                if rand <= quo:
+                    self.getFieldElem(Coordinate(currL, currT)).setAttr("__fieldType", "M")
+                    minesLeft -= 1
+                    minesPlaced += 1
+                if currL < self.__w - 1:
+                    currL += 1
+                elif not (currL < self.__w - 1) and currT < self.__h - 1:
+                    currL = 0
+                    currT += 1
+                else:
+                    currL = 0
+                    currT = 0
+                maxIter -= 1
+                iterCount += 1
+            print(
+                "{} mines placed after {} iterations, \nthat's\t{} mines per iteration or \n\t\t{} iterations per mine.".format(
+                    minesPlaced, iterCount - 1, minesPlaced / (iterCount - 1), (iterCount - 1) / minesPlaced))
 
     def log(self):
         for i in range(2 * self.__w + 3):
@@ -320,7 +328,7 @@ class FieldElem(Standard):
 
 
 def main():
-    field = Field(16, 16, 40)
+    field = Field(30, 16, 170)
     field.log()
 
 
