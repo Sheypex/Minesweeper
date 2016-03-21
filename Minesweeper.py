@@ -9,24 +9,25 @@ class Standard(object):
     def __getitem__(self, item):
         return getattr(self, item, None)
 
-    # def getAttr(self, name):
-    #     return self[name]
-    #
-    # def setAttr(self, name, val):
-    #     self[name] = val
-    #     return self[name]
-
     def setAttr(self, name, val):
+        """
+
+        :type name: String
+        """
         return self.__setattr__(name, val)
 
     def getAttr(self, name):
+        """
+
+        :type name: String
+        """
         return self.__getattribute__(name)
 
 
 class Bunch(dict):
-    def __init__(self, **kw):
-        dict.__init__(self, kw)
-        self.__dict__.update(kw)
+    def __init__(self, **kwargs):
+        dict.__init__(self, kwargs)
+        self.__dict__.update(kwargs)
 
     def __str__(self):
         state = ["%s=%r" % (attribute, value)
@@ -39,6 +40,12 @@ class Bunch(dict):
 
 class Field(Standard):
     def __init__(self, w=10, h=10, mines=10):
+        """
+
+        :type w: Integer
+        :type h: Integer
+        :type mines: Integer
+        """
         # Common field sizes and corresponding mine count, most typical have |> at the end of the line:
         # 9 x 9, 10 |>
         # 9 x 9, 35
@@ -51,6 +58,7 @@ class Field(Standard):
         self.__h = h
         self.__mines = mines
         self.__field = []  # field coordinates: 0 -> first
+        self.__logData = None
         # init Field:
         for i in range(h):
             buf = []
@@ -60,6 +68,10 @@ class Field(Standard):
         self.generateField()
 
     def generateField(self, maxIter=5000):
+        """
+
+        :type maxIter: Integer
+        """
         minesLeft = self.__mines
         minesPlaced = 0
         iterCount = 0
@@ -84,9 +96,11 @@ class Field(Standard):
                     currT = 0
                 maxIter -= 1
                 iterCount += 1
-            print(
-                "{} mines placed after {} iterations, \nthat's\t{} mines per iteration or \n\t\t{} iterations per mine.".format(
-                    minesPlaced, iterCount - 1, minesPlaced / (iterCount - 1), (iterCount - 1) / minesPlaced))
+            self.__logData = Bunch(
+                fullStr="{} mines placed after {} iterations, \nthat's\t{} mines per iteration or \n\t\t{} iterations per mine.".format(
+                    minesPlaced, iterCount - 1, minesPlaced / (iterCount - 1), (iterCount - 1) / minesPlaced),
+                minesPlaced=minesPlaced, iterCount=iterCount, minesPlacedPerIter=minesPlaced / (iterCount - 1),
+                iterPerMinesPlaced=(iterCount - 1) / minesPlaced)
 
     def log(self):
         for i in range(2 * self.__w + 3):
@@ -100,6 +114,7 @@ class Field(Standard):
         for i in range(2 * self.__w + 3):
             print("#", end="")
         print("")
+        print(self.__logData.fullStr)
 
     def getFieldElem(self, coordinates):
         """
@@ -112,13 +127,15 @@ class Field(Standard):
         else:
             return None
 
-    def setFieldElem(self, coordinates, val):
+    def setFieldElem(self, coordinates, fieldElem):
         """
 
         :type coordinates: Coordinate
+        :type fieldElem: FieldElem
+        :rtype FieldElem or None
         """
         if 0 <= coordinates.t <= self.__h - 1 and 0 <= coordinates.l <= self.__w - 1:
-            self.__field[coordinates.t][coordinates.l] = val
+            self.__field[coordinates.t][coordinates.l] = fieldElem
             return self.__field[coordinates.t][coordinates.l]
         else:
             return None
@@ -127,6 +144,8 @@ class Field(Standard):
         """
 
         :type coordinates: Coordinate
+        :type property: String
+        :type create: Boolean
         """
         if 0 <= coordinates.t <= self.__h - 1 and 0 <= coordinates.l <= self.__w - 1:
             if not create:
@@ -145,6 +164,7 @@ class Field(Standard):
         """
 
         :type ownCoordinates: Coordinate
+        :rtype FieldElem or None
         """
         if ownCoordinates.t + 1 <= self.__h - 1:
             return self.__field[ownCoordinates.t + 1][ownCoordinates.l]
@@ -155,6 +175,7 @@ class Field(Standard):
         """
 
         :type ownCoordinates: Coordinate
+        :rtype FieldElem or None
         """
         if ownCoordinates.t - 1 >= 0:
             return self.__field[ownCoordinates.t - 1][ownCoordinates.l]
@@ -165,6 +186,7 @@ class Field(Standard):
         """
 
         :type ownCoordinates: Coordinate
+        :rtype FieldElem or None
         """
         if ownCoordinates.l - 1 >= 0:
             return self.__field[ownCoordinates.t][ownCoordinates.l - 1]
@@ -175,6 +197,7 @@ class Field(Standard):
         """
 
         :type ownCoordinates: Coordinate
+        :rtype FieldElem or None
         """
         if ownCoordinates.l + 1 <= self.__w - 1:
             return self.__field[ownCoordinates.t][ownCoordinates.l + 1]
@@ -193,6 +216,9 @@ class Field(Standard):
 
         :type relCoordinates: Coordinate
         :type ownCoordinates: Coordinate
+        :type method: String: "warp" or "walk"
+        :type autoAdjustMethod: Boolean
+        :rtype FieldElem
         """
         if method == "walk":
             selectedFieldElem = self.getFieldElem(ownCoordinates)
@@ -258,6 +284,8 @@ class Field(Standard):
         """
 
         :type coordinates: Coordinate
+        :type returnType: String: "dict" or "array"
+        :rtype dict of FieldElem or list of FieldElem
         """
         adjacentFieldElems = None
         if returnType == "dict":
@@ -286,6 +314,11 @@ class Field(Standard):
 
 class Coordinate(Standard):
     def __init__(self, l=0, t=0):
+        """
+
+        :type l: Integer
+        :type t: Integer
+        """
         self.l = l
         self.t = t
 
@@ -294,7 +327,14 @@ class Coordinate(Standard):
 
 
 class FieldElem(Standard):
-    def __init__(self, fieldObj: Field, coordinates: Coordinate, fieldElemType, value):
+    def __init__(self, fieldObj, coordinates, fieldElemType, value):
+        """
+
+        :type fieldObj: Field
+        :type coordinates: Coordinate
+        :type fieldElemType: String: "M" or "N"
+        :type value: Integer
+        """
         # self.__fieldObj = fieldObj
         # self.__coordinates = coordinates
         # self.__fieldType = fieldElemType
@@ -304,9 +344,17 @@ class FieldElem(Standard):
                              __hidden=True)
 
     def setAttr(self, name, val):
+        """
+
+        :type name: String
+        """
         self.__bunch[name] = val
 
     def getAttr(self, name):
+        """
+
+        :type name: String
+        """
         return self.__bunch[name]
 
     def log(self, **kwargs):
@@ -315,14 +363,16 @@ class FieldElem(Standard):
     def getNeighbour(self, relCoordinates=Coordinate()):
         """
 
+        :type relCoordinates: Coordinate
         :rtype: list of FieldElem
         """
         return self.__bunch.__fieldObj.getNeighbour(self.__bunch.__coordinates, relCoordinates)
 
-    def getAdjacent(self, returnType):
+    def getAdjacent(self, returnType="dict"):
         """
 
-        :rtype: list of FieldElem
+        :type returnType: String: "dict" or "array"
+        :rtype: dict of FieldElem or list of FieldElem
         """
         return self.__bunch.__fieldObj.getAdjacent(self.__bunch.__coordinates, returnType=returnType)
 
