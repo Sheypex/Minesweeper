@@ -27,15 +27,25 @@ class Standard(object):
 class Bunch(dict):
     def __init__(self, **kwargs):
         dict.__init__(self, kwargs)
-        self.__dict__.update(kwargs)
+        # self.__dict__.update(kwargs)
+        self.__dict__ = self
+        # self.__getattr__ = dict.__getitem__
+        # self.__getattribute__ = dict.__getitem__
+
+    __getattr__ = dict.__getitem__
+
+    def __getstate__(self):
+        return self
+
+    def __setstate__(self, state):
+        self.update(state)
+        self.__dict__ = self
 
     def __str__(self):
         state = ["%s=%r" % (attribute, value)
                  for (attribute, value)
                  in self.__dict__.items()]
         return '\n'.join(state)
-
-    __getattr__ = dict.__getitem__
 
 
 class Field(Standard):
@@ -83,9 +93,24 @@ class Field(Standard):
                 rand = random.random()
                 quo = minesLeft / area
                 if rand <= quo:
-                    self.getFieldElem(Coordinate(currL, currT)).setAttr("__fieldType", "M")
-                    minesLeft -= 1
-                    minesPlaced += 1
+                    selectedFieldElem = self.getFieldElem(Coordinate(currL, currT))
+                    adjacentFieldElems = selectedFieldElem.getAdjacent("array")
+                    # numAdjacent = 0
+                    # numAdjacentMines = 0
+                    # adjacentFieldElemTypes = []
+                    # for i in adjacentFieldElems:
+                    #     if i is not None:
+                    #         numAdjacent += 1
+                    #         adjacentFieldElemTypes.append(i.getAttr("__fieldType"))
+                    #         if i.getAttr("__fieldType") == "M":
+                    #             numAdjacentMines += 1
+                    #     else:
+                    #         adjacentFieldElemTypes.append(None)
+                    # print(selectedFieldElem, adjacentFieldElems, adjacentFieldElemTypes, numAdjacent, numAdjacentMines)
+                    if not self.checkWouldSurround(Coordinate(currL, currT), adjacent=adjacentFieldElems):
+                        self.getFieldElem(Coordinate(currL, currT)).setAttr("__fieldType", "M")
+                        minesLeft -= 1
+                        minesPlaced += 1
                 if currL < self.__w - 1:
                     currL += 1
                 elif not (currL < self.__w - 1) and currT < self.__h - 1:
@@ -97,24 +122,49 @@ class Field(Standard):
                 maxIter -= 1
                 iterCount += 1
             self.__logData = Bunch(
-                fullStr="{} mines placed after {} iterations, \nthat's\t{} mines per iteration or \n\t\t{} iterations per mine.".format(
+                fullStr="{} mines placed after {} iterations; \nthat's\t{} mines per iteration or \n\t\t{} iterations per mine.".format(
                     minesPlaced, iterCount - 1, minesPlaced / (iterCount - 1), (iterCount - 1) / minesPlaced),
                 minesPlaced=minesPlaced, iterCount=iterCount, minesPlacedPerIter=minesPlaced / (iterCount - 1),
                 iterPerMinesPlaced=(iterCount - 1) / minesPlaced)
 
     def log(self):
-        for i in range(2 * self.__w + 3):
-            print("#", end="")
+        for i in range(self.__w + 2):
+            print("# ", end="")
         print("")
         for i, v in enumerate(self.__field):
             print("# ", end="")
             for j, w in enumerate(v):
                 print(str(w.getAttr("__fieldType")) + " ", end="")
             print("#")
-        for i in range(2 * self.__w + 3):
-            print("#", end="")
+        for i in range(self.__w + 2):
+            print("# ", end="")
         print("")
         print(self.__logData.fullStr)
+
+    def checkWouldSurround(self, coordinates, **kwargs):
+        """
+
+        :type coordinates: Coordinate
+        :rtype: Boolean
+        """
+        adjacentFieldElems = None
+        if "adjacent" in kwargs:
+            adjacentFieldElems = kwargs["adjacent"]
+        else:
+            adjacentFieldElems = self.getFieldElem(coordinates).getAdjacent("array")
+        for elem in adjacentFieldElems:
+            if elem is not None:
+                adjacent = elem.getAdjacent("array")
+                numAdjacent = 0
+                numAdjacentMines = 0
+                for i in adjacent:
+                    if i is not None:
+                        numAdjacent += 1
+                        if i.getAttr("__fieldType") == "M":
+                            numAdjacentMines += 1
+                if numAdjacent == numAdjacentMines + 1:
+                    return True
+        return False
 
     def getFieldElem(self, coordinates):
         """
@@ -274,7 +324,7 @@ class Field(Standard):
                 if autoAdjustMethod:
                     return self.getNeighbour(ownCoordinates, relCoordinates, method="walk")
                 else:
-                    print("Caution! #1")
+                    # print("Caution! #1")
                     return None
         else:
             print("Error #2")
@@ -298,15 +348,14 @@ class Field(Standard):
                                   "l": self.getNeighbour(coordinates, Coordinate(-1, 0), autoAdjustMethod=False),
                                   "ul": self.getNeighbour(coordinates, Coordinate(-1, -1), autoAdjustMethod=False)}
         elif returnType == "array":
-            adjacentFieldElems = []
-            adjacentFieldElems.append(self.getNeighbour(coordinates, Coordinate(0, -1), autoAdjustMethod=False))
-            adjacentFieldElems.append(self.getNeighbour(coordinates, Coordinate(1, -1), autoAdjustMethod=False))
-            adjacentFieldElems.append(self.getNeighbour(coordinates, Coordinate(1, 0), autoAdjustMethod=False))
-            adjacentFieldElems.append(self.getNeighbour(coordinates, Coordinate(1, 1), autoAdjustMethod=False))
-            adjacentFieldElems.append(self.getNeighbour(coordinates, Coordinate(0, 1), autoAdjustMethod=False))
-            adjacentFieldElems.append(self.getNeighbour(coordinates, Coordinate(-1, 1), autoAdjustMethod=False))
-            adjacentFieldElems.append(self.getNeighbour(coordinates, Coordinate(-1, 0), autoAdjustMethod=False))
-            adjacentFieldElems.append(self.getNeighbour(coordinates, Coordinate(-1, -1), autoAdjustMethod=False))
+            adjacentFieldElems = [self.getNeighbour(coordinates, Coordinate(0, -1), autoAdjustMethod=False),
+                                  self.getNeighbour(coordinates, Coordinate(1, -1), autoAdjustMethod=False),
+                                  self.getNeighbour(coordinates, Coordinate(1, 0), autoAdjustMethod=False),
+                                  self.getNeighbour(coordinates, Coordinate(1, 1), autoAdjustMethod=False),
+                                  self.getNeighbour(coordinates, Coordinate(0, 1), autoAdjustMethod=False),
+                                  self.getNeighbour(coordinates, Coordinate(-1, 1), autoAdjustMethod=False),
+                                  self.getNeighbour(coordinates, Coordinate(-1, 0), autoAdjustMethod=False),
+                                  self.getNeighbour(coordinates, Coordinate(-1, -1), autoAdjustMethod=False)]
         else:
             print("Error #3")
         return adjacentFieldElems
@@ -340,7 +389,7 @@ class FieldElem(Standard):
         # self.__fieldType = fieldElemType
         # self.__value = value
         # self.__hidden = True
-        self.__bunch = Bunch(__fieldObj=fieldObj, __coorinates=coordinates, __fieldType=fieldElemType, __value=value,
+        self.__bunch = Bunch(__fieldObj=fieldObj, __coordinates=coordinates, __fieldType=fieldElemType, __value=value,
                              __hidden=True)
 
     def setAttr(self, name, val):
@@ -356,6 +405,13 @@ class FieldElem(Standard):
         :type name: String
         """
         return self.__bunch[name]
+
+    def getBunch(self):
+        """
+
+        :rtype Bunch
+        """
+        return self.__bunch
 
     def log(self, **kwargs):
         self.__bunch.__coordinates.log(**kwargs)
@@ -374,12 +430,13 @@ class FieldElem(Standard):
         :type returnType: String: "dict" or "array"
         :rtype: dict of FieldElem or list of FieldElem
         """
-        return self.__bunch.__fieldObj.getAdjacent(self.__bunch.__coordinates, returnType=returnType)
+        return self.getAttr("__fieldObj").getAdjacent(self.getAttr("__coordinates"), returnType=returnType)
 
 
 def main():
     field = Field(30, 16, 170)
     field.log()
+    print("done")
 
 
 if __name__ == '__main__':
