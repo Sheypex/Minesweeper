@@ -1,7 +1,7 @@
 import random
 import sys
 
-from PyQt4 import QtGui
+from PyQt4 import QtGui, QtCore
 
 
 class Standard(object):
@@ -448,26 +448,36 @@ class Window(QtGui.QMainWindow):
         self.statusBar()
         mainMenu = self.menuBar()
         #
+        fileMenu = mainMenu.addMenu("File")
+        #
         extractAction = QtGui.QAction("Quit", self)
         extractAction.setShortcut("Ctrl+Q")
         extractAction.setStatusTip("Quit Minesweeper")
         extractAction.triggered.connect(sys.exit)
         #
-        fileMenu = mainMenu.addMenu("File")
         fileMenu.addAction(extractAction)
         #
-        fieldComboBox = QtGui.QComboBox(self)
+        self.fieldComboBox = QtGui.QComboBox(self)
         optFile = open("fieldOptions.txt")
         for i in optFile:
             if i[0] is not "#":
                 if "\n" in i:
-                    fieldComboBox.addItem(
-                        i[:-1] + " mines")  # [:-1] to truncate the \n from the line of the txt file
+                    self.fieldComboBox.addItem(i[:-1] + " mines", i[:-1])
+                    # [:-1] to truncate the \n from the line of the txt file
+                    # the second argument (the data of the item) can be access in the evFieldComboBox-function by \
+                    # self.fieldComboBox.itemData(self.fieldComboBox.currentIndex())
+                    # the self. is necessary to allow access to the QComboBox-object in the event-handler
                 else:
-                    fieldComboBox.addItem(i + " mines")
-        fieldComboBox.setGeometry(10, 40, 100, 30)
-        fieldComboBox.resize(QtGui.QComboBox.sizeHint(fieldComboBox))
+                    self.fieldComboBox.addItem(i + " mines", i)
+        self.fieldComboBox.move(10, 40)
+        self.fieldComboBox.resize(QtGui.QComboBox.sizeHint(self.fieldComboBox))
+        self.fieldComboBox.activated[str].connect(self.evFieldComboBox)
+        #
         self.show()
+
+    def evFieldComboBox(self, text):
+        print(text)
+        print(self.fieldComboBox.itemData(self.fieldComboBox.currentIndex()))
 
 
 def main():
