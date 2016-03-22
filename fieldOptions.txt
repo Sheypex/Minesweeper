@@ -1,0 +1,9 @@
+# format: width x height, mines
+# a line does not have to end in a new line (\n)
+9 x 9, 10
+9 x 9, 35
+16 x 16, 40
+16 x 16, 99
+30 x 16, 99
+30 x 20, 145
+30 x 16, 170

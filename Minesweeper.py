@@ -1,4 +1,7 @@
 import random
+import sys
+
+from PyQt4 import QtGui
 
 
 class Standard(object):
@@ -64,6 +67,7 @@ class Field(Standard):
         # 30 x 16, 99 |>
         # 30 x 20, 145
         # 30 x 16, 170
+        # These and in general all field size and mine-count options are stored in fieldOptions.txt
         self.__w = w
         self.__h = h
         self.__mines = mines
@@ -433,10 +437,46 @@ class FieldElem(Standard):
         return self.getAttr("__fieldObj").getAdjacent(self.getAttr("__coordinates"), returnType=returnType)
 
 
+class Window(QtGui.QMainWindow):
+    def __init__(self):
+        super(Window, self).__init__()
+        #
+        self.setGeometry(100, 100, 500, 300)
+        self.setWindowTitle("Minesweeper")
+        self.setWindowIcon(QtGui.QIcon("Minesweeper_Icon.png"))
+        #
+        self.statusBar()
+        mainMenu = self.menuBar()
+        #
+        extractAction = QtGui.QAction("Quit", self)
+        extractAction.setShortcut("Ctrl+Q")
+        extractAction.setStatusTip("Quit Minesweeper")
+        extractAction.triggered.connect(sys.exit)
+        #
+        fileMenu = mainMenu.addMenu("File")
+        fileMenu.addAction(extractAction)
+        #
+        fieldComboBox = QtGui.QComboBox(self)
+        optFile = open("fieldOptions.txt")
+        for i in optFile:
+            if i[0] is not "#":
+                if "\n" in i:
+                    fieldComboBox.addItem(
+                        i[:-1] + " mines")  # [:-1] to truncate the \n from the line of the txt file
+                else:
+                    fieldComboBox.addItem(i + " mines")
+        fieldComboBox.setGeometry(10, 40, 100, 30)
+        fieldComboBox.resize(QtGui.QComboBox.sizeHint(fieldComboBox))
+        self.show()
+
+
 def main():
     field = Field(30, 16, 170)
     field.log()
-    print("done")
+
+    app = QtGui.QApplication(sys.argv)
+    window = Window()
+    sys.exit(app.exec_())
 
 
 if __name__ == '__main__':
