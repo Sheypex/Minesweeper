@@ -1,4 +1,5 @@
 import random
+import re
 import sys
 
 from PyQt4 import QtGui, QtCore
@@ -50,14 +51,23 @@ class Bunch(dict):
                  in self.__dict__.items()]
         return '\n'.join(state)
 
-
-class Field(Standard):
-    def __init__(self, w=10, h=10, mines=10):
+    def addItems(self, items):
         """
 
-        :type w: Integer
-        :type h: Integer
-        :type mines: Integer
+        :type items: dict
+        """
+        for i, v in items.items():
+            self[i] = v
+
+
+class Field(Standard):
+    def __init__(self, window, w=10, h=10, mines=10):
+        """
+
+        :type window: Window
+        :type w: int
+        :type h: int
+        :type mines: int
         """
         # Common field sizes and corresponding mine count, most typical have |> at the end of the line:
         # 9 x 9, 10 |>
@@ -68,68 +78,73 @@ class Field(Standard):
         # 30 x 20, 145
         # 30 x 16, 170
         # These and in general all field size and mine-count options are stored in fieldOptions.txt
+        self.__window = window
         self.__w = w
         self.__h = h
         self.__mines = mines
         self.__field = []  # field coordinates: 0 -> first
         self.__logData = None
         # init Field:
-        for i in range(h):
-            buf = []
-            for j in range(w):
-                buf.append(FieldElem(self, Coordinate(j, i), "N", 0))
-            self.__field.append(buf)
         self.generateField()
+
+    def setDimensions(self, dimensionTuple):
+        """
+
+        :type dimensionTuple: tuple
+        """
+        if len(dimensionTuple) != 3:
+            return None
+        else:
+            self.__w, self.__h, self.__mines = dimensionTuple
 
     def generateField(self, maxIter=5000):
         """
 
-        :type maxIter: Integer
+        :type maxIter: int
         """
+        self.__field = []
+        for i in range(self.__h):
+            buf = []
+            for j in range(self.__w):
+                buf.append(FieldElem(self, Coordinate(j, i), "N", 0))
+            self.__field.append(buf)
+        #
         minesLeft = self.__mines
         minesPlaced = 0
         iterCount = 0
         area = self.__w * self.__h
-        if area > minesLeft:
-            currL = 0
-            currT = 0
-            while minesLeft > 0 and maxIter >= 0:
-                rand = random.random()
-                quo = minesLeft / area
-                if rand <= quo:
-                    selectedFieldElem = self.getFieldElem(Coordinate(currL, currT))
-                    adjacentFieldElems = selectedFieldElem.getAdjacent("array")
-                    # numAdjacent = 0
-                    # numAdjacentMines = 0
-                    # adjacentFieldElemTypes = []
-                    # for i in adjacentFieldElems:
-                    #     if i is not None:
-                    #         numAdjacent += 1
-                    #         adjacentFieldElemTypes.append(i.getAttr("__fieldType"))
-                    #         if i.getAttr("__fieldType") == "M":
-                    #             numAdjacentMines += 1
-                    #     else:
-                    #         adjacentFieldElemTypes.append(None)
-                    # print(selectedFieldElem, adjacentFieldElems, adjacentFieldElemTypes, numAdjacent, numAdjacentMines)
-                    if not self.checkWouldSurround(Coordinate(currL, currT), adjacent=adjacentFieldElems):
-                        self.getFieldElem(Coordinate(currL, currT)).setAttr("__fieldType", "M")
-                        minesLeft -= 1
-                        minesPlaced += 1
-                if currL < self.__w - 1:
-                    currL += 1
-                elif not (currL < self.__w - 1) and currT < self.__h - 1:
-                    currL = 0
-                    currT += 1
-                else:
-                    currL = 0
-                    currT = 0
-                maxIter -= 1
-                iterCount += 1
-            self.__logData = Bunch(
-                fullStr="{} mines placed after {} iterations; \nthat's\t{} mines per iteration or \n\t\t{} iterations per mine.".format(
-                    minesPlaced, iterCount - 1, minesPlaced / (iterCount - 1), (iterCount - 1) / minesPlaced),
-                minesPlaced=minesPlaced, iterCount=iterCount, minesPlacedPerIter=minesPlaced / (iterCount - 1),
-                iterPerMinesPlaced=(iterCount - 1) / minesPlaced)
+        if minesLeft >= area:
+            self.__window.messageBox.warning(self.__window, "Please Mind That", "This field cannot be generated fully. \
+The application will try placing as many mines as possible though.", "Alright!")
+        currL = 0
+        currT = 0
+        while minesLeft > 0 and maxIter >= 0:
+            rand = random.random()
+            quo = minesLeft / area
+            if rand <= quo:
+                selectedFieldElem = self.getFieldElem(Coordinate(currL, currT))
+                adjacentFieldElems = selectedFieldElem.getAdjacent("array")
+                if not self.checkWouldSurround(Coordinate(currL, currT), adjacent=adjacentFieldElems):
+                    self.getFieldElem(Coordinate(currL, currT)).setAttr("__fieldType", "M")
+                    minesLeft -= 1
+                    minesPlaced += 1
+            if currL < self.__w - 1:
+                currL += 1
+            elif not (currL < self.__w - 1) and currT < self.__h - 1:
+                currL = 0
+                currT += 1
+            else:
+                currL = 0
+                currT = 0
+            maxIter -= 1
+            iterCount += 1
+        self.__logData = Bunch(
+            fullStr="{} mines placed after {} iterations;\nthat's\t{} \
+mines per iteration or\n\t\t{} iterations per mine.".format(minesPlaced, iterCount - 1,
+                                                            minesPlaced / (iterCount - 1),
+                                                            (iterCount - 1) / minesPlaced),
+            minesPlaced=minesPlaced, iterCount=iterCount, minesPlacedPerIter=minesPlaced / (iterCount - 1),
+            iterPerMinesPlaced=(iterCount - 1) / minesPlaced)
 
     def log(self):
         for i in range(self.__w + 2):
@@ -369,8 +384,8 @@ class Coordinate(Standard):
     def __init__(self, l=0, t=0):
         """
 
-        :type l: Integer
-        :type t: Integer
+        :type l: int
+        :type t: int
         """
         self.l = l
         self.t = t
@@ -386,7 +401,7 @@ class FieldElem(Standard):
         :type fieldObj: Field
         :type coordinates: Coordinate
         :type fieldElemType: String: "M" or "N"
-        :type value: Integer
+        :type value: int
         """
         # self.__fieldObj = fieldObj
         # self.__coordinates = coordinates
@@ -441,7 +456,13 @@ class Window(QtGui.QMainWindow):
     def __init__(self):
         super(Window, self).__init__()
         #
-        self.setGeometry(100, 100, 500, 300)
+        self.bunchOfInternalHandles = Bunch()
+        #
+        field = Field(self)
+        self.bunchOfInternalHandles.addItems({"field": field})
+        #
+        self.resize(800, 480)
+        self.center()
         self.setWindowTitle("Minesweeper")
         self.setWindowIcon(QtGui.QIcon("Minesweeper_Icon.png"))
         #
@@ -461,29 +482,96 @@ class Window(QtGui.QMainWindow):
         optFile = open("fieldOptions.txt")
         for i in optFile:
             if i[0] is not "#":
-                if "\n" in i:
-                    self.fieldComboBox.addItem(i[:-1] + " mines", i[:-1])
-                    # [:-1] to truncate the \n from the line of the txt file
-                    # the second argument (the data of the item) can be access in the evFieldComboBox-function by \
-                    # self.fieldComboBox.itemData(self.fieldComboBox.currentIndex())
-                    # the self. is necessary to allow access to the QComboBox-object in the event-handler
-                else:
-                    self.fieldComboBox.addItem(i + " mines", i)
+                search = re.compile("\d+ x \d+, \d+")  # regEx to search for a valid pattern
+                result = re.search(search, i)  # applying this regEx
+                split = re.compile("\D+")  # regEx used for extracting the 3 Integers from the string
+                peaces = [int(j) for j in re.split(split, i) if j is not ""]  # applying this regEx and converting the \
+                # values from String back to Integer
+                if result is not None:
+                    self.fieldComboBox.addItem(i[result.span()[0]:result.span()[1]] + " mines", peaces)
+        self.fieldComboBox.addItem("Custom", "custom")
         self.fieldComboBox.move(10, 40)
         self.fieldComboBox.resize(QtGui.QComboBox.sizeHint(self.fieldComboBox))
         self.fieldComboBox.activated[str].connect(self.evFieldComboBox)
         #
+        self.prompt = QtGui.QInputDialog(self)
+        self.messageBox = QtGui.QMessageBox(self)
+        #
         self.show()
 
     def evFieldComboBox(self, text):
-        print(text)
-        print(self.fieldComboBox.itemData(self.fieldComboBox.currentIndex()))
+        itemData = self.fieldComboBox.itemData(self.fieldComboBox.currentIndex())
+        if itemData == "custom":
+            inputMade = []
+            #
+            widthPrompt = self.prompt.getInt(self, "Input", "Width:", 10, 1)
+            if widthPrompt[1]:
+                inputMade.append(widthPrompt[0])
+            else:
+                pass
+                # TODO add a handle(?)
+            #
+            heightPrompt = self.prompt.getInt(self, "Input", "Height:", 10, 1)
+            if heightPrompt[1]:
+                inputMade.append(heightPrompt[0])
+            else:
+                pass
+                # TODO add a handle(?)
+            #
+            minePrompt = self.prompt.getInt(self, "Input", "Mines:", 10, 1)
+            if minePrompt[1]:
+                inputMade.append(minePrompt[0])
+            else:
+                pass
+                # TODO add a handle(?)
+            print(inputMade)
+            self.bunchOfInternalHandles["field"].setDimensions(tuple(inputMade))
+            self.bunchOfInternalHandles["field"].generateField()
+            self.bunchOfInternalHandles["field"].log()
+        else:
+            print(text)
+            print(itemData)
+            self.bunchOfInternalHandles["field"].setDimensions(tuple(itemData))
+            self.bunchOfInternalHandles["field"].generateField()
+            self.bunchOfInternalHandles["field"].log()
+
+    def center(self):
+        frame = self.frameGeometry()
+        centerPoint = QtGui.QDesktopWidget().availableGeometry().center()
+        frame.moveCenter(centerPoint)
+        self.move(frame.topLeft())
+
+
+class Sort:
+    def __new__(cls, listOfLists, prioList, *args, **kwargs):
+        """
+
+        :type listOfLists: list of lists
+        :type prioList: list of int
+        """
+        out = listOfLists
+        for i in range(1, len(prioList) + 1):
+            sortIndex = prioList.index(i)
+            print(i, sortIndex)
+            nth = cls.nthItem(cls, sortIndex)
+            test = True
+            while test:
+                test = False
+                for j, v in enumerate(out):
+                    buf = None
+                    if j != 0:
+                        if nth(v) < nth(out[j - 1]):
+                            buf = out[j - 1]
+                            out[j - 1] = out[j]
+                            out[j] = buf
+                            test = True
+        return out
+
+    def nthItem(self, n):
+        return lambda a: a[n]
 
 
 def main():
-    field = Field(30, 16, 170)
-    field.log()
-
     app = QtGui.QApplication(sys.argv)
     window = Window()
     sys.exit(app.exec_())
