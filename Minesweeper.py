@@ -2,7 +2,7 @@ import random
 import re
 import sys
 
-from PyQt4 import QtGui, QtCore
+from PyQt4 import QtGui, QtCore, Qt
 
 
 class Standard(object):
@@ -124,8 +124,21 @@ class Field(Standard):
         iterCount = 0
         area = self.__w * self.__h
         if minesLeft >= area:
-            self.__window.messageBox.warning(self.__window, "Please Mind That", "This field cannot be generated fully. \
-The application will try placing as many mines as possible though.", "Alright!")
+            if self.__window.opts["continueQuestionBoxEnabled"]:
+                continueQuestionBox = self.__window.messageBox.question(self.__window, "Please Mind",
+                                                                        "This field cannot be generated fully.\
+The application will try placing as many mines as possible though.",
+                                                                        "Don't show again!", "Alright!",
+                                                                        defaultButtonNumber=1)
+                if continueQuestionBox == 0:
+                    # the "Don't show again"-btn
+                    self.__window.opts["continueQuestionBoxEnabled"] = False
+                    self.__window.saveOpts()
+                elif continueQuestionBox == 1:
+                    # the "Alright"-btn
+                    pass
+                else:
+                    print("I don't even know what happened here... | 1")
         currL = 0
         currT = 0
         while minesLeft > 0 and maxIter >= 0:
@@ -134,10 +147,14 @@ The application will try placing as many mines as possible though.", "Alright!")
             if rand <= quo:
                 selectedFieldElem = self.getFieldElem(Coordinate(currL, currT))
                 adjacentFieldElems = selectedFieldElem.getAdjacent("array")
-                if not self.checkWouldSurround(Coordinate(currL, currT), adjacent=adjacentFieldElems):
-                    self.getFieldElem(Coordinate(currL, currT)).setAttr("__fieldType", "M")
-                    minesLeft -= 1
-                    minesPlaced += 1
+                if selectedFieldElem.getAttr("__fieldType") == "N":
+                    if not self.checkWouldSurround(Coordinate(currL, currT), adjacent=adjacentFieldElems):
+                        self.getFieldElem(Coordinate(currL, currT)).setAttr("__fieldType", "M")
+                        for i in adjacentFieldElems:
+                            if i is not None:
+                                i.setAttr("__value", i.getAttr("__value") + 1)
+                        minesLeft -= 1
+                        minesPlaced += 1
             if currL < self.__w - 1:
                 currL += 1
             elif not (currL < self.__w - 1) and currT < self.__h - 1:
@@ -163,7 +180,11 @@ mines per iteration or\n\t\t{} iterations per mine.".format(minesPlaced, iterCou
         for i, v in enumerate(self.__field):
             print("# ", end="")
             for j, w in enumerate(v):
-                print(str(w.getAttr("__fieldType")) + " ", end="")
+                if w.getAttr("__fieldType") == "M":
+                    print("M ", end="")
+                elif w.getAttr("__fieldType") == "N":
+                    print("{} ".format(w.getAttr("__value")), end="")
+                    # print(str(w.getAttr("__fieldType")) + " ", end="")
             print("#")
         for i in range(self.__w + 2):
             print("# ", end="")
@@ -468,6 +489,9 @@ class Window(QtGui.QMainWindow):
         #
         self.bunchOfInternalHandles = Bunch()
         #
+        self.opts = {}
+        self.loadOpts("opts.txt")
+        #
         field = Field(self)
         self.bunchOfInternalHandles.addItems({"field": field})
         #
@@ -488,28 +512,45 @@ class Window(QtGui.QMainWindow):
         #
         fileMenu.addAction(extractAction)
         #
+        controllsWidget = QtGui.QWidget(self)
+        controllsWidget.move(0, 25)
+        controllsWidget.resize(800, 50)
+        controllsLayout = QtGui.QHBoxLayout(controllsWidget)
+        #
+        fieldWidget = QtGui.QWidget(self)
+        fieldWidget.move(0, 85)
+        fieldWidget.resize(800, 395)
+        fieldLayout = QtGui.QGridLayout(fieldWidget)
+        #
         self.fieldComboBox = QtGui.QComboBox(self)
-        optFile = open("fieldOptions.txt")
-        for i in optFile:
+        fieldOptionsFile = open("fieldOptions.txt")
+        listOfEntries = []
+        for i in fieldOptionsFile:
             if i[0] is not "#":
-                search = re.compile("\d+ x \d+, \d+")  # regEx to search for a valid pattern
+                search = re.compile("\d+( |\t)+x( |\t)+\d+,( |\t)+\d+")  # regEx to search for a valid pattern
                 result = re.search(search, i)  # applying this regEx
                 split = re.compile("\D+")  # regEx used for extracting the 3 Integers from the string
                 peaces = [int(j) for j in re.split(split, i) if j is not ""]  # applying this regEx and converting the \
                 # values from String back to Integer
                 if result is not None:
-                    self.fieldComboBox.addItem(i[result.span()[0]:result.span()[1]] + " mines", peaces)
-        optFile.close()
+                    #     self.fieldComboBox.addItem(i[result.span()[0]:result.span()[1]] + " mines", peaces)
+                    listOfEntries.append(peaces)
+        sortedListOfEntries = Sort(listOfEntries, [2, 1, 3])
+        for i in sortedListOfEntries:
+            self.fieldComboBox.addItem("{} x {}, {} mines".format(*i), i)
+        fieldOptionsFile.close()
         self.fieldComboBox.addItem("Custom", "custom")
-        self.fieldComboBox.move(10, 35)
-        self.fieldComboBox.resize(QtGui.QComboBox.sizeHint(self.fieldComboBox))
+        # self.fieldComboBox.move(10, 35)
+        # self.fieldComboBox.resize(QtGui.QComboBox.sizeHint(self.fieldComboBox))
         self.fieldComboBox.activated[str].connect(self.evFieldComboBox)
+        controllsLayout.addWidget(self.fieldComboBox)
         #
         self.saveFieldOpts = QtGui.QPushButton("Save this custom field", self)
         self.saveFieldOpts.resize(self.saveFieldOpts.sizeHint())
         self.saveFieldOpts.move(20 + self.fieldComboBox.size().width(), 35)
         self.saveFieldOpts.setVisible(False)
         self.saveFieldOpts.clicked.connect(self.evSaveFieldOptsBtn)
+        controllsLayout.addWidget(self.saveFieldOpts)
         #
         self.prompt = QtGui.QInputDialog(self)
         self.messageBox = QtGui.QMessageBox(self)
@@ -574,6 +615,74 @@ class Window(QtGui.QMainWindow):
         frame.moveCenter(centerPoint)
         self.move(frame.topLeft())
 
+    def loadOpts(self, filename):
+        self.opts = {}
+        optsFile = FileHandler(filename)
+        for i in optsFile.file:
+            if i[0] != "#":
+                search = re.compile("\w+( |\t)+=( |\t)+\S+")  # regEx to search for a valid pattern
+                result = re.search(search, i)  # applying this regEx
+                split = re.compile(" = ")  # regEx used for extracting the 2 parts from the string
+                peaces = []
+                for j in re.split(split, i):
+                    if j is not "":
+                        string = j
+                        if j[-1] == "\n":
+                            string = j[:-1]  # filter out the \n-symbols
+                        value = None
+                        #
+                        floatTest = string.split(".")
+                        #
+                        if string == "True":
+                            value = True
+                        elif string == "False":
+                            value = False
+                        elif string[0] == "[" and string[-1] == "]":
+                            # list
+                            pass
+                        elif string.isdigit():
+                            value = int(string)
+                        elif len(floatTest) == 2:
+                            value = float(string)
+                        else:
+                            # last resort / presume it's a string
+                            value = string
+                        #
+                        peaces.append(value)
+                buf = None
+                for j, v in enumerate(peaces):
+                    if j % 2 == 0:
+                        buf = v
+                    else:
+                        self.opts[str(buf)] = v
+        optsFile.close()
+
+    def saveOpts(self):
+        optsFile = FileHandler("opts.txt")
+        rewrite = ""
+        for i in optsFile.file:
+            if i[0] == "#":
+                rewrite += i
+        optsFile.reopen("w")
+        optsFile.file.write(rewrite)
+        for i, v in self.opts.items():
+            optsFile.file.write("{} = {}\n".format(str(i), str(v)))
+        optsFile.close()
+
+
+class FileHandler(Standard):
+    def __init__(self, filename, mode="rt"):
+        self.filename = filename
+        self.file = open(filename, mode)
+
+    def reopen(self, mode):
+        self.file.close()
+        self.file = open(self.filename, mode)
+
+    def close(self):
+        self.file.close()
+        del self
+
 
 class Sort:
     def __new__(cls, listOfLists, prioList, *args, **kwargs):
@@ -585,7 +694,6 @@ class Sort:
         out = listOfLists
         for i in range(1, len(prioList) + 1):
             sortIndex = prioList.index(i)
-            print(i, sortIndex)
             nth = cls.nthItem(cls, sortIndex)
             test = True
             while test:
@@ -605,6 +713,7 @@ class Sort:
 
 
 def main():
+    print(sys.argv)
     app = QtGui.QApplication(sys.argv)
     window = Window()
     sys.exit(app.exec_())

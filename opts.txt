@@ -1,0 +1,13 @@
+# format: "{var_name}_=_{value}"
+#   (with 'var_name' as String and 'value' as any)
+#   '_' means a multiple of " " ('space's) and/or "    " (\t or 'tab's)
+#       " " ('space's) and "    " (\t or 'tab's) can be mixed
+#   the actual regEx is "\w+( |\t)+=( |\t)+\S+" for that matter
+#       (This is addressed to all those interested; do not feel concerned if you don't understand what this means)
+# a line does not strictly have to end in a new line (\n)
+# lines preceded with '#' won't take effect
+# entries must be separated by a new line as things would break otherwise
+# entries/lines must end in \n or in the last character of a value
+#   -> e.g. "name" = "value"_\n     with '_' as a space is illegal
+# full line comments do not strictly have to either but should for clarity, although that's up to the user (- I reckon)
+continueQuestionBoxEnabled = True
