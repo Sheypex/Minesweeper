@@ -59,6 +59,9 @@ class Bunch(dict):
         for i, v in items.items():
             self[i] = v
 
+    def delItem(self, item):
+        self.pop(item)
+
 
 class Field(Standard):
     def __init__(self, window, w=10, h=10, mines=10):
@@ -96,6 +99,13 @@ class Field(Standard):
             return None
         else:
             self.__w, self.__h, self.__mines = dimensionTuple
+
+    def getDimensions(self):
+        """
+
+        :rtype: tuple(int, int, int)
+        """
+        return self.__w, self.__h, self.__mines
 
     def generateField(self, maxIter=5000):
         """
@@ -489,19 +499,40 @@ class Window(QtGui.QMainWindow):
                 # values from String back to Integer
                 if result is not None:
                     self.fieldComboBox.addItem(i[result.span()[0]:result.span()[1]] + " mines", peaces)
+        optFile.close()
         self.fieldComboBox.addItem("Custom", "custom")
-        self.fieldComboBox.move(10, 40)
+        self.fieldComboBox.move(10, 35)
         self.fieldComboBox.resize(QtGui.QComboBox.sizeHint(self.fieldComboBox))
         self.fieldComboBox.activated[str].connect(self.evFieldComboBox)
+        #
+        self.saveFieldOpts = QtGui.QPushButton("Save this custom field", self)
+        self.saveFieldOpts.resize(self.saveFieldOpts.sizeHint())
+        self.saveFieldOpts.move(20 + self.fieldComboBox.size().width(), 35)
+        self.saveFieldOpts.setVisible(False)
+        self.saveFieldOpts.clicked.connect(self.evSaveFieldOptsBtn)
         #
         self.prompt = QtGui.QInputDialog(self)
         self.messageBox = QtGui.QMessageBox(self)
         #
         self.show()
 
+    def evSaveFieldOptsBtn(self):
+        # check for last character in the file
+        fieldOpts = open("fieldOptions.txt", "rb+")
+        fieldOpts.seek(-1, 2)  # move read/write cursor
+        lastChar = fieldOpts.read()
+        fieldOpts.close()
+        fieldOpts = open("fieldOptions.txt", "a")
+        if lastChar != b'\n':  # determine if a new line is needed
+            fieldOpts.write("\n")
+        fieldOpts.write("{} x {}, {}".format(*self.bunchOfInternalHandles["field"].getDimensions()))
+
     def evFieldComboBox(self, text):
         itemData = self.fieldComboBox.itemData(self.fieldComboBox.currentIndex())
         if itemData == "custom":
+            # TODO make the button-visibility smarter: let it only show if the current custom field is not yet saved
+            self.saveFieldOpts.setVisible(True)
+            #
             inputMade = []
             #
             widthPrompt = self.prompt.getInt(self, "Input", "Width:", 10, 1)
@@ -529,6 +560,8 @@ class Window(QtGui.QMainWindow):
             self.bunchOfInternalHandles["field"].generateField()
             self.bunchOfInternalHandles["field"].log()
         else:
+            self.saveFieldOpts.setVisible(False)
+            #
             print(text)
             print(itemData)
             self.bunchOfInternalHandles["field"].setDimensions(tuple(itemData))
